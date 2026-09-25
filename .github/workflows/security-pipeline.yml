@@ -33,19 +33,40 @@ jobs:
           echo "Verificando se os artefatos foram gerados corretamente:"
           ls -la | grep -E "semgrep-report.json|sbom.json"
 
-      - name: Import SAST results to DefectDojo
+      - name: Import SAST results to DefectDojo (via Python)
         env:
           DEFECTDOJO_URL: ${{ secrets.DEFECTDOJO_URL }}
           DEFECTDOJO_API_KEY: ${{ secrets.DEFECTDOJO_API_KEY }}
         run: |
-          curl -X POST "${{ secrets.DEFECTDOJO_URL }}/api/v2/import-scan/" \
-            -H "Authorization: Token ${{ secrets.DEFECTDOJO_API_KEY }}" \
-            -H "Accept: application/json" \
-            -F "scan_type=Semgrep JSON Report" \
-            -F "file=@semgrep-report.json;type=application/json" \
-            -F "engagement=19" \
-            -F "active=true" \
-            -F "verified=true"
+          pip install requests
+          python -c "
+          import os, sys, requests
+          
+          # Garante que a URL não terá barras duplicadas
+          url = os.environ['DEFECTDOJO_URL'].rstrip('/') + '/api/v2/import-scan/'
+          headers = {'Authorization': 'Token ' + os.environ['DEFECTDOJO_API_KEY']}
+          
+          # Dados do formulário
+          data = {
+              'scan_type': 'Semgrep JSON Report',
+              'engagement': '19',
+              'active': 'true',
+              'verified': 'true'
+          }
+          
+          # Abre e envia o arquivo
+          print('Iniciando upload para o DefectDojo...')
+          with open('semgrep-report.json', 'rb') as f:
+              files = {'file': f}
+              r = requests.post(url, headers=headers, data=data, files=files)
+          
+          print('Status Code: ' + str(r.status_code))
+          print('Resposta: ' + r.text)
+          
+          # Falha a pipeline se o servidor retornar erro
+          if r.status_code >= 400:
+              sys.exit(1)
+          "
 
       - name: Upload SBOM to Dependency-Track
         env:
