@@ -2,7 +2,7 @@ name: DevSecOps Pipeline - VAmPI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
@@ -18,11 +18,6 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
       - name: Run Semgrep SAST
         uses: semgrep/semgrep-action@v1
         with:
@@ -32,10 +27,10 @@ jobs:
           output: semgrep-report.json
         continue-on-error: true
 
-      - name: Generate SBOM with CycloneDX Node
+      - name: Generate SBOM for Python
         run: |
-          npm install -g @cyclonedx/cyclonedx-npm
-          cyclonedx-npm --output-file sbom.json
+          pip install cyclonedx-bom
+          cyclonedx-py -o sbom.json
 
       - name: Import SAST results to DefectDojo
         env:
