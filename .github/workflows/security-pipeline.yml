@@ -18,6 +18,11 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
       - name: Run Semgrep SAST
         uses: semgrep/semgrep-action@v1
         with:
@@ -27,10 +32,10 @@ jobs:
           output: semgrep-report.json
         continue-on-error: true
 
-      - name: Generate SBOM with cdxgen
-        uses: CycloneDX/gh-action-generate-sbom@v3
-        with:
-          output: sbom.json
+      - name: Generate SBOM with CycloneDX Node
+        run: |
+          npm install -g @cyclonedx/cyclonedx-npm
+          cyclonedx-npm --output-file sbom.json
 
       - name: Import SAST results to DefectDojo
         env:
@@ -46,9 +51,12 @@ jobs:
             -F "verified=true"
 
       - name: Upload SBOM to Dependency-Track
-        uses: DependencyTrack/gh-action-dependency-track@v3
-        with:
-          server-url: ${{ secrets.DEPENDENCY_TRACK_URL }}
-          api-key: ${{ secrets.DEPENDENCY_TRACK_API_KEY }}
-          project: ${{ secrets.DEPENDENCY_TRACK_PROJECT_ID }}
-          bom: sbom.json
+        env:
+          DT_URL: ${{ secrets.DEPENDENCY_TRACK_URL }}
+          DT_API_KEY: ${{ secrets.DEPENDENCY_TRACK_API_KEY }}
+          DT_PROJECT_ID: ${{ secrets.DEPENDENCY_TRACK_PROJECT_ID }}
+        run: |
+          curl -X PUT "${{ env.DT_URL }}/api/v1/bom" \
+            -H "Content-Type: application/json" \
+            -H "X-Api-Key: ${{ env.DT_API_KEY }}" \
+            -d "{\"project\": \"${{ env.DT_PROJECT_ID }}\", \"bom\": \"$(base64 -w 0 sbom.json)\"}"
