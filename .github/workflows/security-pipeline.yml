@@ -27,10 +27,10 @@ jobs:
           output: semgrep-report.json
         continue-on-error: true
 
-      - name: Generate SBOM for Python
+      - name: Generate Python SBOM
         run: |
           pip install cyclonedx-bom
-          cyclonedx-py -o sbom.json
+          cyclonedx-py requirements requirements.txt -o sbom.json
 
       - name: Import SAST results to DefectDojo
         env:
