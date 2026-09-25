@@ -1,0 +1,54 @@
+name: DevSecOps Pipeline - VAmPI
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Run Semgrep SAST
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: auto
+          generateato-sarif: "1"
+          publishLintMetrics: "false"
+          output: semgrep-report.json
+        continue-on-error: true
+
+      - name: Generate SBOM with cdxgen
+        uses: CycloneDX/gh-action-generate-sbom@v3
+        with:
+          output: sbom.json
+
+      - name: Import SAST results to DefectDojo
+        env:
+          DEFECTDOJO_URL: ${{ secrets.DEFECTDOJO_URL }}
+          DEFECTDOJO_API_KEY: ${{ secrets.DEFECTDOJO_API_KEY }}
+        run: |
+          curl -X POST "${{ secrets.DEFECTDOJO_URL }}/api/v2/import-scan/" \
+            -H "Authorization: Token ${{ secrets.DEFECTDOJO_API_KEY }}" \
+            -F "scan_type=Semgrep JSON Report" \
+            -F "file=@semgrep-report.json" \
+            -F "engagement=1" \
+            -F "active=true" \
+            -F "verified=true"
+
+      - name: Upload SBOM to Dependency-Track
+        uses: DependencyTrack/gh-action-dependency-track@v3
+        with:
+          server-url: ${{ secrets.DEPENDENCY_TRACK_URL }}
+          api-key: ${{ secrets.DEPENDENCY_TRACK_API_KEY }}
+          project: ${{ secrets.DEPENDENCY_TRACK_PROJECT_ID }}
+          bom: sbom.json
