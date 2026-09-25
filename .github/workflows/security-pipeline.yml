@@ -42,11 +42,12 @@ jobs:
           python -c "
           import os, sys, requests
           
-          # Garante que a URL não terá barras duplicadas
-          url = os.environ['DEFECTDOJO_URL'].rstrip('/') + '/api/v2/import-scan/'
-          headers = {'Authorization': 'Token ' + os.environ['DEFECTDOJO_API_KEY']}
+          # Limpa quebras de linha/espaços da URL e da API Key
+          url = os.environ['DEFECTDOJO_URL'].strip().rstrip('/') + '/api/v2/import-scan/'
+          api_key = os.environ['DEFECTDOJO_API_KEY'].strip()
           
-          # Dados do formulário
+          headers = {'Authorization': 'Token ' + api_key}
+          
           data = {
               'scan_type': 'Semgrep JSON Report',
               'engagement': '19',
@@ -54,7 +55,6 @@ jobs:
               'verified': 'true'
           }
           
-          # Abre e envia o arquivo
           print('Iniciando upload para o DefectDojo...')
           with open('semgrep-report.json', 'rb') as f:
               files = {'file': f}
@@ -63,7 +63,6 @@ jobs:
           print('Status Code: ' + str(r.status_code))
           print('Resposta: ' + r.text)
           
-          # Falha a pipeline se o servidor retornar erro
           if r.status_code >= 400:
               sys.exit(1)
           "
